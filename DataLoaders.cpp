@@ -71,6 +71,7 @@ int get_cifar_num_images(std::string bin_path) {
 }
 
 void load_cifar_batch_random(std::string bin_path, int batch_size,
+                             Halide::Image<float> mean,
                              Halide::Image<float> &batch,
                              Halide::Image<int> &image_labels) {
 
@@ -109,7 +110,7 @@ void load_cifar_batch_random(std::string bin_path, int batch_size,
                     for(int r = 0; r < n_rows; ++r) {
                         unsigned char pix = 0;
                         file.read((char*) &pix, sizeof(pix));
-                        batch(r, c, ch, i) = (float) pix;
+                        batch(r, c, ch, i) = (float) pix - mean(r, c, ch);
                     }
                 }
             }
@@ -118,7 +119,8 @@ void load_cifar_batch_random(std::string bin_path, int batch_size,
 }
 
 void load_cifar_batch(std::string bin_path, int batch_size,
-                      int index, Halide::Image<float> &batch,
+                      int index, Halide::Image<float> mean,
+                      Halide::Image<float> &batch,
                       Halide::Image<int> &image_labels) {
 
     std::ifstream file(bin_path, std::ifstream::binary | std::ifstream::ate);
@@ -153,7 +155,54 @@ void load_cifar_batch(std::string bin_path, int batch_size,
                     for(int r = 0; r < n_rows; ++r) {
                         unsigned char pix = 0;
                         file.read((char*) &pix, sizeof(pix));
-                        batch(r, c, ch, i) = (float) pix;
+                        batch(r, c, ch, i) = (float) pix - mean(r, c, ch);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void compute_cifar_mean(std::string bin_path, Halide::Image<float> &mean) {
+
+    std::ifstream file(bin_path, std::ifstream::binary | std::ifstream::ate);
+
+    if (!file) {
+        std::cout << "Cannot open CIFAR data file: " << bin_path << std::endl;
+        exit(1);
+    }
+
+    if (file.is_open()) {
+        int n_rows = 32;
+        int n_cols = 32;
+        size_t bytes_per_image = 2 + n_rows * n_cols * 3;
+        size_t num_bytes_in_file = file.tellg();
+        assert(num_bytes_in_file % bytes_per_image == 0);
+
+        for(int ch = 0; ch < 3; ++ch) {
+            for(int c = 0; c < n_cols; ++c) {
+                for(int r = 0; r < n_rows; ++r) {
+                    mean(r, c, ch) = 0.0f;
+                }
+            }
+        }
+
+        int number_of_images = num_bytes_in_file/bytes_per_image;
+        file.seekg(0);
+
+        float scale = 1.0f/(number_of_images);
+        for(int i = 0; i < number_of_images; ++i) {
+            unsigned char label = 0;
+            // Ignore the super class label
+            file.read((char*) &label, sizeof(label));
+            // Get the fine grained label
+            file.read((char*) &label, sizeof(label));
+            for(int ch = 0; ch < 3; ++ch) {
+                for(int c = 0; c < n_cols; ++c) {
+                    for(int r = 0; r < n_rows; ++r) {
+                        unsigned char pix = 0;
+                        file.read((char*) &pix, sizeof(pix));
+                        mean(r, c, ch) += (float) pix * scale;
                     }
                 }
             }

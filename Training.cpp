@@ -256,6 +256,10 @@ int main(int argc, char **argv) {
     // Halide pipeline
     Pipeline training_pipeline(train_outs);
 
+    // Compute the mean of the cifar training data set
+    Image<float> mean(data_width, data_height, 3);
+    compute_cifar_mean(cifar_training_data_path, mean);
+
     // get pointer to the network's data layer since its contents will
     // need to be filled in by a mini-batch of images in either
     // iteration of training
@@ -290,7 +294,7 @@ int main(int argc, char **argv) {
             // data is loaded into these buffers, the network is read to
             // perform and forward/backward pass to compute gradients from
             // this minibatch
-            load_cifar_batch_random(cifar_training_data_path, batch_size,
+            load_cifar_batch_random(cifar_training_data_path, batch_size, mean,
                                     data_layer->input, training_labels);
 
             // run forward evaluation and back-prop to compute gradients

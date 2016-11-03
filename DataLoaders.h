@@ -12,12 +12,17 @@ void get_reference_labels(std::string reference_file_name,
                           std::vector<float>& scores);
 
 void load_cifar_batch(std::string bin_path, int batch_size,
-                      int index, Image<float> &batch,
+                      int index,
+                      Image<float> mean,
+                      Image<float> &batch,
                       Image<int> &image_labels);
 
 void load_cifar_batch_random(std::string bin_path, int batch_size,
+                             Image<float> mean,
                              Image<float> &batch,
                              Image<int> &image_labels);
+
+void compute_cifar_mean(std::string bin_path, Image<float> &mean);
 
 int get_cifar_num_images(std::string bin_path);
 
