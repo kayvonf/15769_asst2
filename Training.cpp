@@ -352,5 +352,66 @@ int main(int argc, char **argv) {
     }
 
     std::cout << "Completed training!" << std::endl;
+
+    //
+    // Now verify the accuracy of your network.
+    //
+
+    std::cout << "Running inference on test set to check accuracy of the trainined network..." << std::endl;
+
+    std::string cifar_test_data_path = data_path + "/cifar-100-binary/test.bin";
+    int num_test_images = get_cifar_num_images(cifar_test_data_path);
+
+    std::vector<Func> test_outs;
+    test_outs.push_back(toy.layers["prob"]->forward);
+    Pipeline test_pipeline(test_outs);
+
+    size_t num_batches = num_test_images/batch_size;
+    int num_total = 0;
+    int num_correct = 0;
+    for (size_t b_id = 0; b_id < num_batches; b_id++) {
+
+        auto start = std::chrono::steady_clock::now();
+
+        int image_index = b_id * batch_size;
+        load_cifar_batch(cifar_test_data_path, batch_size, image_index, mean,
+                         data_layer->input, training_labels);
+
+        test_pipeline.realize({scores});
+
+        int max_index = std::min(batch_size, num_test_images - image_index);
+        int n = 0;
+
+        // for all images in the batch, check the predicted class
+        // label against the ground truth class label
+        for (int l = 0; l < max_index; l++) {
+
+            // find max score
+            int best_class = 0;
+            float best_score = 0.0f;
+            for (int c = 0; c < scores.extent(0); c++) {
+                if (scores(c, n) > best_score) {
+                    best_score = scores(c, n);
+                    best_class = c;
+                }
+            }
+
+            // check against ground truth
+            if (best_class == training_labels(l)) {
+                num_correct++;
+            }
+
+            num_total++;
+            n++;
+        }
+
+        auto end = std::chrono::steady_clock::now();
+        int elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        std::cout << "Batch time (inference): " << elapsed
+            << "ms" << " (" <<  ((float)elapsed / batch_size) << " ms/image)" << std::endl;
+    }
+
+    std::cout << "Test set accuracy: " << (float)num_correct/num_total << std::endl;
+
     return 0;
 }
